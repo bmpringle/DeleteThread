@@ -45,17 +45,29 @@ void deleteThreadFunction(std::mutex* accessMutex, std::queue<std::pair<bool*, T
 template<class T>
 class DeleteThread {
     public:
-        DeleteThread(std::function<void(T)> deleteFunction) : threadShouldTerminate(false) {
+        DeleteThread() {
+
+        }
+
+        DeleteThread(std::function<void(T)> deleteFunction) :  validInstance(true), threadShouldTerminate(false) {
             deleteThread = std::thread(deleteThreadFunction<T>, &accessMutex, &destructionQueue, deleteFunction, &threadShouldTerminate);
         }
 
         void addObjectToDelete(T obj, bool* condition) {
+            if(!validInstance) {
+                return;
+            }
+
             accessMutex.lock();
             destructionQueue.push(std::pair<bool*, T>(condition, obj));
             accessMutex.unlock();
         }
 
         ~DeleteThread() {
+            if(!validInstance) {
+                return;
+            }
+
             accessMutex.lock();
             threadShouldTerminate = true;
             accessMutex.unlock();
@@ -63,6 +75,8 @@ class DeleteThread {
             deleteThread.detach();
         }
     private:
+        bool validInstance = false;
+
         bool threadShouldTerminate;
         std::thread deleteThread;
         std::mutex accessMutex;
