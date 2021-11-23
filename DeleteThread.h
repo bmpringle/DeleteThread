@@ -40,6 +40,12 @@ void deleteThreadFunction(std::mutex* accessMutex, std::queue<std::pair<bool*, T
 
         accessMutex->unlock();  
     }
+
+    /*
+    safe to delete accessmutex here because if shouldTerminate is ever true and the mutex is unlocked, then the DeleteThread object is in the dtor after its last use of accessMutex, and so can be
+    deleted at the end of this function.
+    */
+    delete accessMutex;
 }
 
 template<class T>
@@ -50,7 +56,8 @@ class DeleteThread {
         }
 
         DeleteThread(std::function<void(T)> deleteFunction) :  validInstance(true), threadShouldTerminate(false) {
-            deleteThread = std::thread(deleteThreadFunction<T>, &accessMutex, &destructionQueue, deleteFunction, &threadShouldTerminate);
+            accessMutex = new std::mutex();
+            deleteThread = new std::thread(deleteThreadFunction<T>, accessMutex, &destructionQueue, deleteFunction, &threadShouldTerminate);
         }
 
         void addObjectToDelete(T obj, bool* condition) {
@@ -58,9 +65,9 @@ class DeleteThread {
                 return;
             }
 
-            accessMutex.lock();
+            accessMutex->lock();
             destructionQueue.push(std::pair<bool*, T>(condition, obj));
-            accessMutex.unlock();
+            accessMutex->unlock();
         }
 
         ~DeleteThread() {
@@ -68,18 +75,22 @@ class DeleteThread {
                 return;
             }
 
-            accessMutex.lock();
+            accessMutex->lock();
             threadShouldTerminate = true;
-            accessMutex.unlock();
+            accessMutex->unlock();
 
-            deleteThread.detach();
+            deleteThread->detach();
+
+            delete deleteThread;
         }
     private:
         bool validInstance = false;
 
         bool threadShouldTerminate;
-        std::thread deleteThread;
-        std::mutex accessMutex;
+
+        //use normal pointers instead of shared pointers because shared pointers aren't thread safe by default (I think).
+        std::thread* deleteThread;
+        std::mutex* accessMutex;
 
         std::queue<std::pair<bool*, T> > destructionQueue;
 };
