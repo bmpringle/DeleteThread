@@ -33,6 +33,7 @@ void deleteThreadFunction(std::mutex* accessMutex, std::queue<std::pair<bool*, T
 
         accessMutex->lock();
         T objectToDelete = queue->front().second;
+        *queue->fornt().first = false;
         queue->pop();
         deleteFunction(objectToDelete);
 
