@@ -123,6 +123,10 @@ class DeleteThread {
             return accessMutex;
         }
 
+        bool isValidInstance() {
+            return validInstance;
+        }
+
     private:
         bool validInstance = false;
 

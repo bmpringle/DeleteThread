@@ -23,7 +23,9 @@ void deleteFunc(int keyToDelete) {
 }
 
 int main() {
-    DeleteThread<int> dThread = DeleteThread<int>(deleteFunc);
+    DeleteThread<int> dThread1 = DeleteThread<int>(deleteFunc);
+
+    DeleteThread<int> dThread = dThread1;
 
     intToStringMap[1] = "hi!";
     intToStringMap[2] = "this is another hi!";
