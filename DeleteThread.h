@@ -56,9 +56,43 @@ class DeleteThread {
 
         }
 
-        DeleteThread(std::function<void(T)> deleteFunction) :  validInstance(true), threadShouldTerminate(false) {
+        DeleteThread(std::function<void(T)> deleteFunction) :  validInstance(true), threadShouldTerminate(false), deleteFunctionStore(deleteFunction) {
             accessMutex = new std::mutex();
             deleteThread = new std::thread(deleteThreadFunction<T>, accessMutex, &destructionQueue, deleteFunction, &threadShouldTerminate);
+        }
+
+        DeleteThread(const DeleteThread& delThread) {
+            validInstance = delThread.validInstance;
+
+            threadShouldTerminate = false;
+
+            if(validInstance) {
+                accessMutex = new std::mutex();
+
+                destructionQueue = delThread.destructionQueue;
+
+                deleteFunctionStore = delThread.deleteFunctionStore;
+
+                deleteThread = new std::thread(deleteThreadFunction<T>, accessMutex, &destructionQueue, deleteFunctionStore, &threadShouldTerminate);
+            }
+        }
+
+        DeleteThread& operator=(const DeleteThread& delThread) {
+            validInstance = delThread.validInstance;
+
+            threadShouldTerminate = false;
+
+            if(validInstance) {
+                accessMutex = new std::mutex();
+
+                destructionQueue = delThread.destructionQueue;
+
+                deleteFunctionStore = delThread.deleteFunctionStore;
+
+                deleteThread = new std::thread(deleteThreadFunction<T>, accessMutex, &destructionQueue, deleteFunctionStore, &threadShouldTerminate);
+            }
+
+            return *this;
         }
 
         void addObjectToDelete(T obj, bool* condition) {
@@ -99,6 +133,8 @@ class DeleteThread {
         std::mutex* accessMutex;
 
         std::queue<std::pair<bool*, T> > destructionQueue;
+
+        std::function<void(T)> deleteFunctionStore;
 };
 
 #endif
