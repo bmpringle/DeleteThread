@@ -37,6 +37,8 @@ int main() {
     dThread.addObjectToDelete(2, &countdown2);
     dThread.addObjectToDelete(69, &countdown69);
 
+    std::mutex* accessMutex = dThread.getMutexPointer();
+
     bool shouldLoop = true;
 
     auto startTimer = std::chrono::high_resolution_clock::now();
@@ -55,7 +57,9 @@ int main() {
         int duration = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - startTimer).count();
 
         if(duration > 5000) {
+            accessMutex->lock();
             countdown1 = true;
+            accessMutex->unlock();
         }else {
             if(5 - (duration/1000) < lastCountdownForCD1) {
                 std::cout << lastCountdownForCD1 << " until object 1 is deleted from the map!" << std::endl;
@@ -65,7 +69,9 @@ int main() {
         }
 
         if(duration > 10000) {
+            accessMutex->lock();
             countdown2 = true;
+            accessMutex->unlock();
         }else {
             if(10 - (duration/1000) < lastCountdownForCD2) {
                 std::cout << lastCountdownForCD2 << " until object 2 is deleted from the map!" << std::endl;
@@ -74,7 +80,9 @@ int main() {
         }
 
         if(duration > 15000) {
+            accessMutex->lock();
             countdown69 = true;
+            accessMutex->unlock();
         }else {
             if(15 - (duration/1000) < lastCountdownForCD69) {
                 std::cout << lastCountdownForCD69 << " until object 69 is deleted from the map!" << std::endl;
@@ -82,7 +90,9 @@ int main() {
             }
         }
 
+        accessMutex->lock();
         shouldLoop = !(countdown1 && countdown2 && countdown69);
+        accessMutex->unlock();
     }
 
     //give it a little more time than its timeout to realize it should delete the last object
