@@ -17,10 +17,14 @@ void deleteThreadFunction(std::mutex* accessMutex, std::queue<std::pair<bool*, T
 
         while(!shouldDestroy && !terminate) {
             accessMutex->lock();
-            bool isEmpty = queue->empty();
+            bool isEmpty = queue->size() == 0;
 
             if(!isEmpty) {
-                if(*queue->front().first) {
+                std::pair<bool*, T> front = queue->front();
+                if(front.first == nullptr) {
+                    std::runtime_error("queue is null");
+                }
+                if(*front.first) {
                     shouldDestroy = true;
                 }
             }
@@ -39,7 +43,7 @@ void deleteThreadFunction(std::mutex* accessMutex, std::queue<std::pair<bool*, T
 
         terminate = *shouldTerminate;
 
-        accessMutex->unlock();  
+        accessMutex->unlock();
     }
 
     /*
@@ -61,7 +65,18 @@ class DeleteThread {
             deleteThread = new std::thread(deleteThreadFunction<T>, accessMutex, &destructionQueue, deleteFunction, &threadShouldTerminate);
         }
 
-        DeleteThread(const DeleteThread& delThread) {
+        /*DeleteThread(const DeleteThread& delThread) {
+            std::cout << "DT&" << std::endl;
+            if(validInstance) {
+                accessMutex->lock();
+                threadShouldTerminate = true;
+                accessMutex->unlock();
+
+                deleteThread->detach();
+
+                delete deleteThread;
+            }
+
             validInstance = delThread.validInstance;
 
             threadShouldTerminate = false;
@@ -69,15 +84,26 @@ class DeleteThread {
             if(validInstance) {
                 accessMutex = new std::mutex();
 
-                destructionQueue = delThread.destructionQueue;
+                destructionQueue = std::queue<std::pair<bool*, T> >();
 
                 deleteFunctionStore = delThread.deleteFunctionStore;
 
                 deleteThread = new std::thread(deleteThreadFunction<T>, accessMutex, &destructionQueue, deleteFunctionStore, &threadShouldTerminate);
             }
-        }
+        }*/
 
-        DeleteThread& operator=(const DeleteThread& delThread) {
+        /*DeleteThread& operator=(const DeleteThread& delThread) {
+            std::cout << "op=" << std::endl;
+            if(validInstance) {
+                accessMutex->lock();
+                threadShouldTerminate = true;
+                accessMutex->unlock();
+
+                deleteThread->detach();
+
+                delete deleteThread;
+            }
+
             validInstance = delThread.validInstance;
 
             threadShouldTerminate = false;
@@ -85,7 +111,7 @@ class DeleteThread {
             if(validInstance) {
                 accessMutex = new std::mutex();
 
-                destructionQueue = delThread.destructionQueue;
+                destructionQueue = std::queue<std::pair<bool*, T> >();
 
                 deleteFunctionStore = delThread.deleteFunctionStore;
 
@@ -93,7 +119,7 @@ class DeleteThread {
             }
 
             return *this;
-        }
+        }*/
 
         void addObjectToDelete(T obj, bool* condition) {
             if(!validInstance) {
