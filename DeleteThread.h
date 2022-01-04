@@ -7,7 +7,7 @@
 #include <functional>
 
 template<class T>
-void deleteThreadFunction(std::mutex* accessMutex, std::queue<std::pair<bool*, T> >* queue, std::function<void(T)> deleteFunction, bool* shouldTerminate) {
+void deleteThreadFunction(std::mutex* accessMutex, std::queue<std::pair<bool*, T> >* queue, std::function<void(T)> deleteFunction, bool* shouldTerminate, bool* forceDeleteAndTerminate) {
     accessMutex->lock();
     bool terminate = *shouldTerminate;
     accessMutex->unlock();
@@ -28,6 +28,9 @@ void deleteThreadFunction(std::mutex* accessMutex, std::queue<std::pair<bool*, T
                     shouldDestroy = true;
                 }
             }
+
+            terminate = *shouldTerminate || *forceDeleteAndTerminate;
+
             accessMutex->unlock();
 
             if(!shouldDestroy) {
@@ -35,13 +38,24 @@ void deleteThreadFunction(std::mutex* accessMutex, std::queue<std::pair<bool*, T
             }
         }
 
-        accessMutex->lock();
-        T objectToDelete = queue->front().second;
-        *queue->front().first = false;
-        queue->pop();
-        deleteFunction(objectToDelete);
+        if(shouldDestroy) {
+            accessMutex->lock();
+            T objectToDelete = queue->front().second;
+            *queue->front().first = false;
+            queue->pop();
+            deleteFunction(objectToDelete);
+        }
 
-        terminate = *shouldTerminate;
+        terminate = *shouldTerminate || *forceDeleteAndTerminate;
+
+        if(forceDeleteAndTerminate) {
+            while(!queue->empty()) {
+                T objectToDelete = queue->front().second;
+                *queue->front().first = false;
+                queue->pop();
+                deleteFunction(objectToDelete);
+            }
+        }
 
         accessMutex->unlock();
     }
@@ -51,6 +65,10 @@ void deleteThreadFunction(std::mutex* accessMutex, std::queue<std::pair<bool*, T
     deleted at the end of this function.
     */
     delete accessMutex;
+
+    delete shouldTerminate;
+    
+    delete forceDeleteAndTerminate;
 }
 
 template<class T>
@@ -60,9 +78,9 @@ class DeleteThread {
 
         }
 
-        DeleteThread(std::function<void(T)> deleteFunction) :  validInstance(true), threadShouldTerminate(false), deleteFunctionStore(deleteFunction) {
+        DeleteThread(std::function<void(T)> deleteFunction) :  validInstance(true), deleteFunctionStore(deleteFunction) {
             accessMutex = new std::mutex();
-            deleteThread = new std::thread(deleteThreadFunction<T>, accessMutex, &destructionQueue, deleteFunction, &threadShouldTerminate);
+            deleteThread = new std::thread(deleteThreadFunction<T>, accessMutex, &destructionQueue, deleteFunction, threadShouldTerminate, forceDeleteAndTerminate);
         }
 
         /*DeleteThread(const DeleteThread& delThread) {
@@ -131,13 +149,25 @@ class DeleteThread {
             accessMutex->unlock();
         }
 
+        void forceJoin() {
+            accessMutex->lock();
+            *forceDeleteAndTerminate = true;
+            accessMutex->unlock();
+
+            deleteThread->join();
+
+            validInstance = false; //this invalidates the instance
+
+            delete deleteThread;
+        };
+
         ~DeleteThread() {
             if(!validInstance) {
                 return;
             }
 
             accessMutex->lock();
-            threadShouldTerminate = true;
+            *threadShouldTerminate = true;
             accessMutex->unlock();
 
             deleteThread->detach();
@@ -154,9 +184,11 @@ class DeleteThread {
         }
 
     private:
+        bool* forceDeleteAndTerminate = new bool(false);
+
         bool validInstance = false;
 
-        bool threadShouldTerminate;
+        bool* threadShouldTerminate = new bool(false);
 
         //use normal pointers instead of shared pointers because shared pointers aren't thread safe by default (I think).
         std::thread* deleteThread;
